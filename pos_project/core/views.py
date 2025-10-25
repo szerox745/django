@@ -1,23 +1,40 @@
-# ... (importaciones existentes)
-from django.db import transaction
-from pos_project.choices import EstadoOrden
-from core.models import OrdenCompraCliente, ItemOrdenCompraCliente
-from core.forms import OrdenForm, ItemOrdenForm
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 import uuid
-# Se han corregido las importaciones para ser absolutas y evitar errores del editor.
-from core.models import Articulo, GrupoArticulo, LineaArticulo, ListaPrecio
-from core.forms import ArticuloForm, ListaPrecioForm
 from django.contrib.auth import get_user_model
+from django.db import transaction
+from .filters import ArticuloFilter
 
-from django.http import JsonResponse
-from .models import LineaArticulo
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated  # <-- AÑADE ESTA
+from .serializers import ArticuloSerializer, OrdenCompraClienteSerializer # <-- MODIFICA ESTA
+from .models import Articulo # Esta ya debería estar, pero asegúrate
+
+# Importaciones de Modelos
+from core.models import (
+    Articulo, GrupoArticulo, LineaArticulo, ListaPrecio,
+    OrdenCompraCliente, ItemOrdenCompraCliente
+)
+# Importaciones de Forms
+from core.forms import (
+    ArticuloForm, ListaPrecioForm, OrdenForm, ItemOrdenForm
+)
+# Importaciones de Choices
+from pos_project.choices import EstadoOrden
+
+# --- IMPORTACIONES PARA DRF (API) ---
+from rest_framework import viewsets
+from .serializers import ArticuloSerializer
+
 
 Usuario = get_user_model()
+
+# ===============================================
+# === VISTAS WEB (GUÍA 04) ===
+# ===============================================
 
 @login_required
 def home(request):
@@ -92,8 +109,6 @@ def articulo_edit(request, articulo_id):
 def articulo_delete(request, articulo_id):
     """Vista para eliminar un artículo."""
     articulo = get_object_or_404(Articulo, articulo_id=articulo_id)
-    # En un caso real, aquí iría una página de confirmación.
-    # Por simplicidad en la guía, eliminamos directamente.
     articulo.delete()
     messages.success(request, 'Artículo eliminado correctamente.')
     return redirect('articulos_list')
@@ -111,20 +126,20 @@ def cargar_lineas(request):
     data = [{'id': linea.pk, 'nombre': linea.nombre_linea} for linea in lineas]
     return JsonResponse(data, safe=False)
 
-# --- VISTAS DEL CARRITO DE COMPRAS ---
+# ===============================================
+# === VISTAS DEL CARRITO DE COMPRAS (GUÍA 05) ===
+# ===============================================
 
 @login_required
 def crear_orden(request):
     """
     Crea una nueva orden de compra para el cliente actual o recupera la existente.
     """
-    # Busca una orden pendiente para el usuario actual
     orden, created = OrdenCompraCliente.objects.get_or_create(
         cliente=request.user,
         estado=EstadoOrden.PENDIENTE
     )
     
-    # Si se crea una nueva, se guarda. Si se recupera, simplemente se redirige.
     if created:
         orden.save()
         messages.success(request, 'Nuevo carrito de compras creado.')
@@ -142,7 +157,6 @@ def ver_carrito(request):
         orden = OrdenCompraCliente.objects.get(cliente=request.user, estado=EstadoOrden.PENDIENTE)
         items = orden.items.all().order_by('articulo__descripcion')
         
-        # Calcular el importe total de la orden
         orden.importe = sum(item.total_item for item in items)
         orden.save()
 
@@ -157,26 +171,23 @@ def ver_carrito(request):
     })
 
 @login_required
-@transaction.atomic # Asegura que todas las operaciones de BD se completen con éxito
+@transaction.atomic 
 def agregar_al_carrito(request, articulo_id):
     """
     Agrega un artículo al carrito de compras (orden pendiente).
     """
     articulo = get_object_or_404(Articulo, articulo_id=articulo_id)
     
-    # 1. Obtener o crear la orden pendiente
     orden, created = OrdenCompraCliente.objects.get_or_create(
         cliente=request.user,
         estado=EstadoOrden.PENDIENTE
     )
     
-    # 2. Obtener el precio del artículo (usamos precio_1)
     precio = getattr(articulo.listaprecio, 'precio_1', 0)
     if precio <= 0:
         messages.error(request, f"El artículo '{articulo.descripcion}' no tiene precio definido.")
         return redirect(request.META.get('HTTP_REFERER', 'articulos_list'))
 
-    # 3. Revisar si el item ya está en el carrito
     item, item_created = ItemOrdenCompraCliente.objects.get_or_create(
         orden=orden,
         articulo=articulo,
@@ -186,7 +197,6 @@ def agregar_al_carrito(request, articulo_id):
         }
     )
     
-    # 4. Si el item ya existía, solo aumentamos la cantidad
     if not item_created:
         item.cantidad += 1
         item.save()
@@ -227,14 +237,9 @@ def confirmar_orden(request):
             messages.error(request, "Tu carrito está vacío, no se puede confirmar.")
             return redirect('ver_carrito')
             
-        # Recalcular el total final
         orden.importe = sum(item.total_item for item in items)
-        
-        # Cambiar estado y guardar
         orden.estado = EstadoOrden.PROCESANDO
         orden.save()
-        
-        # Aquí iría la lógica de descuento de stock, envío de email, etc.
         
         messages.success(request, f"Orden #{orden.pedido_id} confirmada exitosamente.")
         return redirect('orden_confirmada', orden_id=orden.pedido_id)
@@ -271,3 +276,36 @@ def detalle_orden(request, orden_id):
         'orden': orden,
         'items': items
     })
+
+# ===============================================
+# === VISTAS DE API (DRF CON VIEWSETS - GUÍA 06) ===
+# ===============================================
+
+class ArticuloViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint que permite ver, crear, actualizar y eliminar Artículos.
+    Combina todas las operaciones (List, Retrieve, Create, Update, Delete)
+    en una sola clase.
+    """
+    queryset = Articulo.objects.select_related('grupo', 'linea', 'listaprecio').all().order_by('descripcion')
+    serializer_class = ArticuloSerializer
+    lookup_field = 'articulo_id' # Le seguimos diciendo que use 'articulo_id'
+
+    filterset_class = ArticuloFilter
+    # ... (debajo de ArticuloViewSet)
+
+class OrdenViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint que permite a los usuarios ver sus propias órdenes.
+    Es de "Solo Lectura" (no se pueden crear/borrar órdenes desde aquí).
+    """
+    serializer_class = OrdenCompraClienteSerializer
+    permission_classes = [IsAuthenticated] # <-- Solo usuarios logueados pueden ver esto
+    lookup_field = 'pedido_id'
+
+    def get_queryset(self):
+        """
+        Sobrescribimos este método para que la API solo devuelva
+        las órdenes que pertenecen al usuario que está haciendo la consulta.
+        """
+        return OrdenCompraCliente.objects.filter(cliente=self.request.user).order_by('-fecha_pedido')
