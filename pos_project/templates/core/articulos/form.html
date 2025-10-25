@@ -45,7 +45,9 @@
           return;
         }
   
-        fetch(`/core/ajax/cargar-lineas/?grupo_id=${grupoId}`)
+        // --- LÍNEA CORREGIDA ---
+        fetch(`{% url 'ajax_cargar_lineas' %}?grupo_id=${grupoId}`)
+        // --- FIN DE LA CORRECCIÓN ---
           .then(response => response.json())
           .then(data => {
             // Limpiar opciones actuales

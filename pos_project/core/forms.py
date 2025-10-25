@@ -1,5 +1,5 @@
 from django import forms
-from .models import Articulo, ListaPrecio, GrupoArticulo, LineaArticulo
+from .models import Articulo, ListaPrecio, GrupoArticulo, LineaArticulo, OrdenCompraCliente, ItemOrdenCompraCliente
 from pos_project.choices import EstadoEntidades
 
 class ArticuloForm(forms.ModelForm):
@@ -81,3 +81,18 @@ class ListaPrecioForm(forms.ModelForm):
             'precio_compra': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'precio_costo': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
         }
+
+
+class OrdenForm(forms.ModelForm):
+    class Meta:
+        model = OrdenCompraCliente
+        fields = ['cliente', 'estado'] # Campos iniciales
+
+class ItemOrdenForm(forms.ModelForm):
+    class Meta:
+        model = ItemOrdenCompraCliente
+        fields = ['articulo', 'cantidad', 'precio_unitario']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['articulo'].queryset = Articulo.objects.filter(estado=EstadoEntidades.ACTIVO)

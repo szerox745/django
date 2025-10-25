@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
-from pos_project.choices import EstadoEntidades
+from pos_project.choices import EstadoEntidades, EstadoOrden
+from django.contrib.auth import get_user_model
 
 # Modelo para agrupar artículos (ej: Bebidas, Lácteos, Limpieza)
 class GrupoArticulo(models.Model):
@@ -69,17 +70,41 @@ class ListaPrecio(models.Model):
         verbose_name = "Lista de Precio"
         verbose_name_plural = "Listas de Precios"
 
-### Pasos Siguientes (Muy Importante)
+# --- AGREGA ESTOS MODELOS AL FINAL ---
 
-# Después de guardar los cambios en `core/models.py`, Django necesitará actualizar la base de datos para crear estas nuevas tablas.
+class OrdenCompraCliente(models.Model):
+    pedido_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cliente = models.ForeignKey(get_user_model(), on_delete=models.RESTRICT)
+    fecha_pedido = models.DateTimeField(auto_now_add=True)
+    importe = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    estado = models.IntegerField(choices=EstadoOrden.choices, default=EstadoOrden.PENDIENTE)
 
-# 1.  **Crea el archivo de migración:**
-#     ```bash
-#     python manage.py makemigrations core
-#     ```
+    def __str__(self):
+        return f"Orden {self.pedido_id} - Cliente {self.cliente.full_name}"
 
-# 2.  **Aplica los cambios a la base de datos:**
-#     ```bash
-#     python manage.py migrate
-    
+    class Meta:
+        db_table = "ordenes_compra_cliente"
+        verbose_name = "Orden de Compra"
+        verbose_name_plural = "Órdenes de Compra"
+
+class ItemOrdenCompraCliente(models.Model):
+    item_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    orden = models.ForeignKey(OrdenCompraCliente, on_delete=models.CASCADE, related_name='items')
+    articulo = models.ForeignKey(Articulo, on_delete=models.RESTRICT)
+    cantidad = models.DecimalField(max_digits=10, decimal_places=2)
+    precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
+    total_item = models.DecimalField(max_digits=12, decimal_places=2)
+
+    def save(self, *args, **kwargs):
+        # Calcula el total del item antes de guardar
+        self.total_item = self.cantidad * self.precio_unitario
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Item {self.articulo.descripcion} - Orden {self.orden.pedido_id}"
+
+    class Meta:
+        db_table = "items_orden_compra_cliente"
+        verbose_name = "Ítem de Orden"
+        verbose_name_plural = "Ítems de Órdenes"
 

@@ -43,6 +43,9 @@
                         <td>${{ articulo.listaprecio.precio_1|default:"N/A" }}</td>
                         <td>
                             <div class="btn-group btn-group-sm">
+                                <a href="{% url 'agregar_al_carrito' articulo.articulo_id %}" class="btn btn-success" data-bs-toggle="tooltip" title="Agregar al Carrito">
+                                    <i class="fas fa-cart-plus"></i>
+                                </a>
                                 <a href="{% url 'articulo_detail' articulo.articulo_id %}" class="btn btn-primary" data-bs-toggle="tooltip" title="Ver detalle"><i class="fas fa-eye"></i></a>
                                 <a href="{% url 'articulo_edit' articulo.articulo_id %}" class="btn btn-warning" data-bs-toggle="tooltip" title="Editar"><i class="fas fa-edit"></i></a>
                                 <a href="{% url 'articulo_delete' articulo.articulo_id %}" class="btn btn-danger" onclick="return confirmarEliminacion(event, '¿Eliminar este artículo?')" data-bs-toggle="tooltip" title="Eliminar"><i class="fas fa-trash"></i></a>
@@ -59,4 +62,32 @@
         </div>
     </div>
 </div>
+
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if articulos.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1">&laquo; Primera</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ articulos.previous_page_number }}">Anterior</a>
+            </li>
+        {% endif %}
+
+        <li class="page-item disabled">
+            <span class="page-link">
+                Página {{ articulos.number }} de {{ articulos.paginator.num_pages }}.
+            </span>
+        </li>
+
+        {% if articulos.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ articulos.next_page_number }}">Siguiente</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ articulos.paginator.num_pages }}">Última &raquo;</a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
 {% endblock %}

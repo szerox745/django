@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mi Carrito de Compras - Sistema POS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="h3"><i class="fas fa-shopping-cart me-2"></i>Mi Carrito de Compras</h2>
+</div>
+
+{% if not orden or not items %}
+    <div class="alert alert-info text-center" role="alert">
+        <h4 class="alert-heading">¡Tu carrito está vacío!</h4>
+        <p>Aún no has agregado artículos a tu carrito.</p>
+        <hr>
+        <a href="{% url 'articulos_list' %}" class="btn btn-primary"><i class="fas fa-boxes me-1"></i>Ver Artículos</a>
+    </div>
+{% else %}
+    <div class="card shadow">
+        <div class="card-header bg-white"><h5 class="mb-0">Artículos en tu orden</h5></div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Artículo</th>
+                            <th>Precio Unitario</th>
+                            <th>Cantidad</th>
+                            <th>Total Item</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ item.articulo.descripcion }}</td>
+                            <td>${{ item.precio_unitario|floatformat:2 }}</td>
+                            <td>{{ item.cantidad|floatformat:0 }}</td>
+                            <td><strong>${{ item.total_item|floatformat:2 }}</strong></td>
+                            <td>
+                                <a href="{% url 'eliminar_del_carrito' item.item_id %}" class="btn btn-danger btn-sm" onclick="return confirm('¿Quitar este artículo del carrito?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer bg-light d-flex justify-content-between align-items-center">
+            <h4>Total de la Orden: <span class="text-success">${{ orden.importe|floatformat:2 }}</span></h4>
+            <a href="{% url 'confirmar_orden' %}" class="btn btn-success btn-lg" onclick="return confirm('¿Confirmar y procesar esta orden?')">
+                <i class="fas fa-check-circle me-1"></i>Confirmar Orden
+            </a>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

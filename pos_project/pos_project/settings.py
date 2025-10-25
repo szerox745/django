@@ -79,14 +79,23 @@ WSGI_APPLICATION = 'pos_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# --- CONFIGURACIÓN DE POSTGRESQL (COMENTADA) ---
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'dbpedidos',
+#         'USER': 'admin_pedidos',
+#         'PASSWORD': 'dba', 
+#         'HOST': '127.0.0.1',
+#         'PORT': '5432'
+#     }
+# }
+
+# --- NUEVA CONFIGURACIÓN CON SQLite (PARA USAR SIN POSTGRESQL) ---
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'dbpedidos',
-        'USER': 'admin_pedidos',
-        'PASSWORD': 'dba', 
-        'HOST': '127.0.0.1',
-        'PORT': '5432'
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -140,4 +149,3 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
