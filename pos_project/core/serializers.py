@@ -1,10 +1,10 @@
 from rest_framework import serializers
-# --- MODIFICA ESTA LÍNEA ---
 from .models import (
     Articulo, ListaPrecio, GrupoArticulo, LineaArticulo,
     OrdenCompraCliente, ItemOrdenCompraCliente
 )
 from django.contrib.auth import get_user_model
+
 
 class GrupoArticuloSerializer(serializers.ModelSerializer):
     """ Serializer para el modelo GrupoArticulo """
@@ -27,14 +27,20 @@ class ListaPrecioSerializer(serializers.ModelSerializer):
 class ArticuloSerializer(serializers.ModelSerializer):
     """
     Serializer para el modelo Articulo.
-    Incluye serializadores anidados para Grupo, Linea y ListaPrecio.
+    Serializer dinámico:
+    - LECTURA: Muestra todos los objetos anidados (Grupo, Linea, ListaPrecio).
+    - ESCRITURA: Solo pide los IDs (UUIDs) de grupo y linea.
     """
-    # Usamos los serializers anidados que definimos arriba
+    
+    # --- CAMPOS ANIDADOS (SOLO LECTURA) ---
     grupo = GrupoArticuloSerializer(read_only=True)
     linea = LineaArticuloSerializer(read_only=True)
     listaprecio = ListaPrecioSerializer(read_only=True)
 
-    # Campos que queremos exponer del modelo Articulo
+    # --- CAMPOS PARA ESCRITURA (CREAR/ACTUALIZAR) ---
+    grupo_id = serializers.UUIDField(source='grupo', write_only=True)
+    linea_id = serializers.UUIDField(source='linea', write_only=True)
+    
     class Meta:
         model = Articulo
         fields = [
@@ -42,10 +48,44 @@ class ArticuloSerializer(serializers.ModelSerializer):
             'codigo_articulo',
             'descripcion',
             'stock',
+            
+            # Campos de lectura (anidados)
             'grupo',
             'linea',
-            'listaprecio'
+            'listaprecio',
+            
+            # Campos de escritura (IDs)
+            'grupo_id',
+            'linea_id'
         ]
+        
+        read_only_fields = ['articulo_id', 'grupo', 'linea', 'listaprecio']
+        write_only_fields = ['grupo_id', 'linea_id']
+
+    def validate_stock(self, value):
+        """
+        Validación a nivel de campo: Asegura que el stock no sea negativo.
+        """
+        if value < 0:
+            raise serializers.ValidationError("El stock no puede ser negativo.")
+        return value
+
+    def validate(self, data):
+        """
+        Validación a nivel de objeto: Comprueba dependencias (ej: que la línea pertenezca al grupo).
+        """
+        if 'grupo' in data and 'linea' in data:
+            grupo = data['grupo']
+            linea = data['linea']
+            
+            if not hasattr(linea, 'grupo'):
+                raise serializers.ValidationError("Línea no encontrada.")
+
+            if linea.grupo != grupo:
+                raise serializers.ValidationError(
+                    f"La línea '{linea.nombre_linea}' no pertenece al grupo '{grupo.nombre_grupo}'."
+                )
+        return data
 
 # ===============================================
 # === SERIALIZERS PARA ÓRDENES (GUÍA 06) ===
@@ -67,9 +107,8 @@ class ArticuloSimpleSerializer(serializers.ModelSerializer):
 
 class ItemOrdenCompraClienteSerializer(serializers.ModelSerializer):
     """ Serializer para el modelo ItemOrdenCompraCliente (el detalle de la orden) """
-    # Usamos el serializer simple de Artículo para no anidar toda la info
     articulo = ArticuloSimpleSerializer(read_only=True)
-
+    
     class Meta:
         model = ItemOrdenCompraCliente
         fields = [
@@ -83,15 +122,8 @@ class ItemOrdenCompraClienteSerializer(serializers.ModelSerializer):
 
 class OrdenCompraClienteSerializer(serializers.ModelSerializer):
     """ Serializer para el modelo OrdenCompraCliente (la cabecera de la orden) """
-
-    # Anidamos el serializer de Usuario
     cliente = UsuarioSerializer(read_only=True)
-
-    # Anidamos los Items (detalle) de la orden.
-    # 'many=True' porque una orden tiene muchos items.
     items = ItemOrdenCompraClienteSerializer(many=True, read_only=True)
-
-    # Añadimos un campo 'get_estado_display' para ver el texto del estado
     estado = serializers.CharField(source='get_estado_display')
 
     class Meta:
@@ -102,5 +134,5 @@ class OrdenCompraClienteSerializer(serializers.ModelSerializer):
             'fecha_pedido',
             'importe',
             'estado',
-            'items' # <--- El detalle anidado
+            'items'
         ]

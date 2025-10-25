@@ -173,5 +173,8 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',  # Límite para usuarios anónimos (100 por día)
         'user': '1000/day' # Límite para usuarios autenticados (1000 por día)
+
+        
     },
+    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
 }
